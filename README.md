@@ -22,7 +22,7 @@ WAHA MCP Server bridges the powerful [WAHA (WhatsApp HTTP API)](https://waha.dev
 ### ✨ Key Features
 
 - 📱 **Complete WhatsApp Control** - Send/receive messages, manage chats, create groups
-- 🎯 **62 Tools** - Comprehensive API coverage for sessions, messaging, contacts, and groups
+- 🎯 **63 Tools** - Comprehensive API coverage for sessions, messaging, contacts, groups, and interactive workflows
 - 🔄 **Smart Media Handling** - Auto-conversion for voice/video, support for URLs & local files
 - 🤖 **AI-Native** - Built specifically for LLM integration via MCP
 - 🔒 **Secure** - Environment-based API key management
@@ -249,6 +249,39 @@ mcporter call 'waha-mcp.waha_send_text(chatId: "1234567890@c.us", text: "Hello f
 | `waha_delete_label` | Delete a label |
 | `waha_add_label_to_chat` | Add label to chat |
 | `waha_remove_label_from_chat` | Remove label from chat |
+
+</details>
+
+<details>
+<summary><b>🆕 Interactive Workflows (1 tool)</b></summary>
+
+| Tool | Description |
+|------|-------------|
+| `ask_user_via_whatsapp` | **🚀 NEW!** Send a question and WAIT for user reply (blocking operation). Perfect for Claude Code workflows that need user input mid-execution. |
+
+**Use Case Example:**
+```typescript
+// Claude Code is building a feature and needs clarification
+const reply = await ask_user_via_whatsapp({
+  question: "Should I use REST or GraphQL for the API?",
+  chatId: "1234567890@c.us",
+  timeoutMinutes: 30
+});
+// User replies from phone: "Use GraphQL"
+// Claude Code continues with GraphQL implementation
+```
+
+**How it works:**
+1. Sends your question via WhatsApp
+2. Polls for new messages from the user
+3. Returns the reply text when received
+4. Includes timeout handling (default: 60 minutes)
+
+**Perfect for:**
+- 🤖 Claude Code asking questions mid-workflow
+- 💡 Getting user input while you're away from the computer
+- 🔄 Building truly interactive AI automations
+- 📱 Answering from your phone while AI continues working
 
 </details>
 
