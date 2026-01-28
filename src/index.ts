@@ -11,6 +11,7 @@ import { registerContactTools } from './tools/contacts.js';
 import { registerGroupTools } from './tools/groups.js';
 import { registerPresenceTools } from './tools/presence.js';
 import { registerLabelTools } from './tools/labels.js';
+import { registerInteractiveTools } from './tools/interactive.js';
 
 const WAHA_URL = process.env.WAHA_URL || 'http://localhost:3001';
 const WAHA_API_KEY = process.env.WAHA_API_KEY;
@@ -46,6 +47,7 @@ registerContactTools(server, client);
 registerGroupTools(server, client);
 registerPresenceTools(server, client);
 registerLabelTools(server, client);
+registerInteractiveTools(server, client);
 
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();
