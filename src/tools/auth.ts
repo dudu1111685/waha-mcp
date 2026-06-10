@@ -1,100 +1,88 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { WAHAClient } from '../client.js';
+import { WAHAApiError, WAHAClient } from '../client.js';
+import { defineTool } from '../utils/define-tool.js';
 
 export function registerAuthTools(server: McpServer, client: WAHAClient): void {
-  server.tool(
-    'waha_get_qr_code',
-    'Get QR code for WhatsApp authentication. Returns the raw QR string value that can be used to generate a scannable QR code.',
-    {
+  defineTool(server, {
+    name: 'waha_get_qr_code',
+    description: 'Get the WhatsApp login QR code for a session in SCAN_QR_CODE state. format=image (default) returns a scannable QR image; format=raw returns the raw QR string value.',
+    schema: {
       session: z.string().default('default').describe('Session name'),
+      format: z.enum(['raw', 'image']).default('image').describe('"image" returns a scannable QR image, "raw" returns the QR string value'),
     },
-    async ({ session }) => {
+    annotations: { readOnlyHint: true },
+    handler: async ({ session, format }) => {
       try {
-        const qr = await client.get<string>(
+        if (format === 'image') {
+          const { data, contentType } = await client.download(
+            `/api/${encodeURIComponent(session)}/auth/qr?format=image`,
+          );
+          return {
+            content: [{
+              type: 'image',
+              data: data.toString('base64'),
+              mimeType: contentType,
+            }],
+          };
+        }
+        const qr = await client.get<{ value: string }>(
           `/api/${encodeURIComponent(session)}/auth/qr`,
           { format: 'raw' },
         );
-        return {
-          content: [{ type: 'text', text: `QR Code value for session "${session}":\n${qr}` }],
-        };
+        return `QR code value for session "${session}": ${qr.value}`;
       } catch (error) {
-        const msg = (error as Error).message;
-        if (msg.includes('404') || msg.includes('not found')) {
-          return {
-            content: [{ type: 'text', text: `Session "${session}" is not in QR scan state. Check session status first.` }],
-            isError: true,
-          };
+        if (error instanceof WAHAApiError && error.statusCode === 404) {
+          throw new Error(
+            `Session "${session}" is not in QR scan state — check status with waha_check_auth_status first.`,
+          );
         }
-        return {
-          content: [{ type: 'text', text: `Error getting QR code: ${msg}` }],
-          isError: true,
-        };
+        throw error;
       }
     },
-  );
+  });
 
-  server.tool(
-    'waha_request_pairing_code',
-    'Request a pairing code for phone number authentication (alternative to QR code). The user will receive a code on their phone to enter in WhatsApp.',
-    {
+  defineTool(server, {
+    name: 'waha_request_pairing_code',
+    description: 'Request a pairing code for phone-number authentication (alternative to QR scan). The user enters the returned code in WhatsApp on their phone.',
+    schema: {
       session: z.string().default('default').describe('Session name'),
       phoneNumber: z.string().describe('Phone number in international format without + (e.g. "12132132130")'),
     },
-    async ({ session, phoneNumber }) => {
-      try {
-        const result = await client.post<{ code: string }>(
-          `/api/${encodeURIComponent(session)}/auth/request-code`,
-          { phoneNumber },
-        );
-        return {
-          content: [{
-            type: 'text',
-            text: `Pairing code requested for ${phoneNumber} on session "${session}".\nCode: ${result.code}\nEnter this code in WhatsApp on your phone.`,
-          }],
-        };
-      } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Error requesting pairing code: ${(error as Error).message}` }],
-          isError: true,
-        };
-      }
+    handler: async ({ session, phoneNumber }) => {
+      const result = await client.post<{ code: string }>(
+        `/api/${encodeURIComponent(session)}/auth/request-code`,
+        { phoneNumber },
+      );
+      return `Pairing code for ${phoneNumber}: ${result.code}. Enter it in WhatsApp on the phone.`;
     },
-  );
+  });
 
-  server.tool(
-    'waha_check_auth_status',
-    'Check the authentication status of a WhatsApp session',
-    {
+  defineTool(server, {
+    name: 'waha_check_auth_status',
+    description: 'Check the authentication status of a WhatsApp session. Use before fetching a QR code or sending messages.',
+    schema: {
       session: z.string().default('default').describe('Session name'),
     },
-    async ({ session }) => {
-      try {
-        const info = await client.get<{ status: string; me?: { id: string; pushName?: string } }>(
-          `/api/sessions/${encodeURIComponent(session)}`,
-        );
-        const statusMessages: Record<string, string> = {
-          STOPPED: 'Session is stopped. Start it first.',
-          STARTING: 'Session is starting up...',
-          SCAN_QR_CODE: 'Waiting for QR code scan. Use waha_get_qr_code or waha_request_pairing_code.',
-          WORKING: 'Session is authenticated and working.',
-          FAILED: 'Session has failed. Try restarting or re-authenticating.',
-        };
-        const description = statusMessages[info.status] ?? `Unknown status: ${info.status}`;
-        let text = `Session: ${session}\nStatus: ${info.status}\n${description}`;
-        if (info.me) {
-          text += `\nAccount ID: ${info.me.id}`;
-          if (info.me.pushName) text += `\nName: ${info.me.pushName}`;
-        }
-        return {
-          content: [{ type: 'text', text }],
-        };
-      } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Error checking auth status: ${(error as Error).message}` }],
-          isError: true,
-        };
+    annotations: { readOnlyHint: true },
+    handler: async ({ session }) => {
+      const info = await client.get<{ status: string; me?: { id: string; pushName?: string } }>(
+        `/api/sessions/${encodeURIComponent(session)}`,
+      );
+      const statusMessages: Record<string, string> = {
+        STOPPED: 'Session is stopped. Start it first.',
+        STARTING: 'Session is starting up...',
+        SCAN_QR_CODE: 'Waiting for QR code scan. Use waha_get_qr_code or waha_request_pairing_code.',
+        WORKING: 'Session is authenticated and working.',
+        FAILED: 'Session has failed. Try restarting or re-authenticating.',
+      };
+      const description = statusMessages[info.status] ?? `Unknown status: ${info.status}`;
+      let text = `Session: ${session}\nStatus: ${info.status}\n${description}`;
+      if (info.me) {
+        text += `\nAccount ID: ${info.me.id}`;
+        if (info.me.pushName) text += `\nName: ${info.me.pushName}`;
       }
+      return text;
     },
-  );
+  });
 }

@@ -1,122 +1,112 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { WAHAClient } from '../client.js';
+import { WAHAApiError, WAHAClient } from '../client.js';
 import { PresenceData } from '../types.js';
+import { defineTool } from '../utils/define-tool.js';
+import { compactJson, formatTime } from '../utils/format.js';
+
+/** WAHA presence response: top-level chat id plus per-participant presences. */
+interface ChatPresences {
+  id: string;
+  presences?: PresenceData[];
+}
+
+function projectPresence(p: PresenceData): Record<string, unknown> {
+  return {
+    id: p.participant ?? p.id,
+    lastKnownPresence: p.lastKnownPresence,
+    lastSeen: p.lastSeen ? formatTime(p.lastSeen) : undefined,
+  };
+}
 
 export function registerPresenceTools(server: McpServer, client: WAHAClient): void {
-  server.tool(
-    'waha_set_presence',
-    'Set your presence status (online/offline)',
-    {
+  defineTool(server, {
+    name: 'waha_set_presence',
+    description: 'Set your own global presence to online or offline. Use before/after sending to appear natural.',
+    schema: {
       presence: z.enum(['online', 'offline']).describe('Presence status to set'),
       session: z.string().default('default').describe('Session name'),
     },
-    async ({ presence, session }) => {
-      try {
-        await client.post(`/api/${encodeURIComponent(session)}/presence`, { presence });
-        return {
-          content: [{ type: 'text', text: `Presence set to "${presence}".` }],
-        };
-      } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Error setting presence: ${(error as Error).message}` }],
-          isError: true,
-        };
-      }
+    annotations: { idempotentHint: true },
+    handler: async ({ presence, session }) => {
+      await client.post(`/api/${encodeURIComponent(session)}/presence`, { presence });
+      return `Presence set to "${presence}".`;
     },
-  );
+  });
 
-  server.tool(
-    'waha_get_presence',
-    'Get presence status of a contact (online/offline/typing)',
-    {
-      contactId: z.string().describe('Contact ID (e.g. "1234567890@c.us")'),
+  defineTool(server, {
+    name: 'waha_subscribe_presence',
+    description: 'Subscribe to presence updates for a chat/contact (chatId like 123@c.us). Required on some engines before waha_get_presence returns data.',
+    schema: {
+      chatId: z.string().describe('Chat/contact ID (e.g. "123@c.us")'),
       session: z.string().default('default').describe('Session name'),
     },
-    async ({ contactId, session }) => {
+    annotations: { idempotentHint: true },
+    handler: async ({ chatId, session }) => {
+      await client.post(
+        `/api/${encodeURIComponent(session)}/presence/${encodeURIComponent(chatId)}/subscribe`,
+      );
+      return `Subscribed to presence updates for ${chatId}.`;
+    },
+  });
+
+  defineTool(server, {
+    name: 'waha_get_presence',
+    description: 'Get last known presence (online/offline/typing, last seen) of a contact or group participants. Call waha_subscribe_presence first if no data is returned. chatId like 123@c.us.',
+    schema: {
+      chatId: z.string().describe('Chat/contact ID (e.g. "123@c.us")'),
+      session: z.string().default('default').describe('Session name'),
+    },
+    annotations: { readOnlyHint: true },
+    handler: async ({ chatId, session }) => {
+      let result: ChatPresences;
       try {
-        const presence = await client.get<PresenceData[]>(
-          `/api/${encodeURIComponent(session)}/presence/${encodeURIComponent(contactId)}`,
+        result = await client.get<ChatPresences>(
+          `/api/${encodeURIComponent(session)}/presence/${encodeURIComponent(chatId)}`,
         );
-        return {
-          content: [{ type: 'text', text: JSON.stringify(presence, null, 2) }],
-        };
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Error getting presence: ${(error as Error).message}` }],
-          isError: true,
-        };
+        if (error instanceof WAHAApiError && error.statusCode === 500) {
+          throw new Error(
+            'Presence queries are not supported by the WEBJS engine on this WAHA build. Use NOWEB/GOWS for presence features.',
+          );
+        }
+        throw error;
       }
+      const presences = result.presences ?? [];
+      if (presences.length === 0) {
+        return `No presence data for ${result.id ?? chatId}. Try waha_subscribe_presence first.`;
+      }
+      return presences
+        .map((p) => compactJson({ ...projectPresence(p), id: p.participant ?? result.id ?? chatId }))
+        .join('\n');
     },
-  );
+  });
 
-  server.tool(
-    'waha_start_typing',
-    'Show typing indicator in a chat (simulates real user behavior)',
-    {
-      chatId: z.string().describe('Chat ID'),
+  defineTool(server, {
+    name: 'waha_start_typing',
+    description: 'Show a typing indicator in a chat (chatId like 123@c.us / 123@g.us). Pair with waha_stop_typing before sending the message.',
+    schema: {
+      chatId: z.string().describe('Chat ID (e.g. "123@c.us" or "123@g.us")'),
       session: z.string().default('default').describe('Session name'),
     },
-    async ({ chatId, session }) => {
-      try {
-        await client.post('/api/startTyping', { session, chatId });
-        return {
-          content: [{ type: 'text', text: `Typing indicator started in ${chatId}.` }],
-        };
-      } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Error starting typing: ${(error as Error).message}` }],
-          isError: true,
-        };
-      }
+    annotations: { idempotentHint: true },
+    handler: async ({ chatId, session }) => {
+      await client.post('/api/startTyping', { session, chatId });
+      return `Typing started in ${chatId}.`;
     },
-  );
+  });
 
-  server.tool(
-    'waha_stop_typing',
-    'Stop showing typing indicator in a chat',
-    {
-      chatId: z.string().describe('Chat ID'),
+  defineTool(server, {
+    name: 'waha_stop_typing',
+    description: 'Stop the typing indicator previously started with waha_start_typing.',
+    schema: {
+      chatId: z.string().describe('Chat ID (e.g. "123@c.us" or "123@g.us")'),
       session: z.string().default('default').describe('Session name'),
     },
-    async ({ chatId, session }) => {
-      try {
-        await client.post('/api/stopTyping', { session, chatId });
-        return {
-          content: [{ type: 'text', text: `Typing indicator stopped in ${chatId}.` }],
-        };
-      } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Error stopping typing: ${(error as Error).message}` }],
-          isError: true,
-        };
-      }
+    annotations: { idempotentHint: true },
+    handler: async ({ chatId, session }) => {
+      await client.post('/api/stopTyping', { session, chatId });
+      return `Typing stopped in ${chatId}.`;
     },
-  );
-
-  server.tool(
-    'waha_send_status',
-    'Post a text status/story update',
-    {
-      text: z.string().describe('Status text'),
-      session: z.string().default('default').describe('Session name'),
-    },
-    async ({ text, session }) => {
-      try {
-        const result = await client.post<{ id: string }>('/api/sendText', {
-          session,
-          chatId: 'status@broadcast',
-          text,
-        });
-        return {
-          content: [{ type: 'text', text: `Status posted successfully.\nMessage ID: ${result.id}` }],
-        };
-      } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Error posting status: ${(error as Error).message}` }],
-          isError: true,
-        };
-      }
-    },
-  );
+  });
 }

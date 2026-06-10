@@ -1,132 +1,132 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { WAHAClient } from '../client.js';
-import { Label } from '../types.js';
+import { ChatInfo, Label } from '../types.js';
+import { defineTool } from '../utils/define-tool.js';
+import { listResponse, projectChat } from '../utils/format.js';
+
+function projectLabel(l: Label): Record<string, unknown> {
+  return {
+    id: l.id,
+    name: l.name,
+    color: l.colorHex ?? l.color,
+  };
+}
 
 export function registerLabelTools(server: McpServer, client: WAHAClient): void {
-  server.tool(
-    'waha_get_labels',
-    'Get all labels/categories in a WhatsApp session',
-    {
+  defineTool(server, {
+    name: 'waha_get_labels',
+    description:
+      'List all labels defined in the WhatsApp account. Use to find label ids before tagging chats or querying chats by label.',
+    schema: {
       session: z.string().default('default').describe('Session name'),
     },
-    async ({ session }) => {
-      try {
-        const labels = await client.get<Label[]>(
-          `/api/${encodeURIComponent(session)}/labels`,
-        );
-        return {
-          content: [{ type: 'text', text: JSON.stringify(labels, null, 2) }],
-        };
-      } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Error getting labels: ${(error as Error).message}` }],
-          isError: true,
-        };
-      }
+    annotations: { readOnlyHint: true },
+    handler: async ({ session }) => {
+      const labels = await client.get<Label[]>(`/api/${encodeURIComponent(session)}/labels`);
+      return listResponse(labels, { map: projectLabel, label: 'labels' });
     },
-  );
+  });
 
-  server.tool(
-    'waha_create_label',
-    'Create a new label',
-    {
+  defineTool(server, {
+    name: 'waha_create_label',
+    description: 'Create a new label in the WhatsApp account (e.g. "needs-human" for triage).',
+    schema: {
       name: z.string().describe('Label name'),
-      color: z.number().optional().describe('Label color index'),
+      color: z.number().int().min(0).max(19).default(0).describe('Label color index (0-19; WAHA requires a color)'),
       session: z.string().default('default').describe('Session name'),
     },
-    async ({ name, color, session }) => {
-      try {
-        const body: Record<string, unknown> = { name };
-        if (color !== undefined) body.color = color;
-
-        const result = await client.post<Label>(
-          `/api/${encodeURIComponent(session)}/labels`,
-          body,
-        );
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
-      } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Error creating label: ${(error as Error).message}` }],
-          isError: true,
-        };
-      }
+    handler: async ({ name, color, session }) => {
+      const label = await client.post<Label>(`/api/${encodeURIComponent(session)}/labels`, { name, color });
+      return `Created. id=${label.id} name=${label.name}`;
     },
-  );
+  });
 
-  server.tool(
-    'waha_delete_label',
-    'Delete a label',
-    {
+  defineTool(server, {
+    name: 'waha_update_label',
+    description: 'Rename a label or change its color. Get label ids with waha_get_labels.',
+    schema: {
+      labelId: z.string().describe('Label ID'),
+      name: z.string().describe('New label name'),
+      color: z.number().int().min(0).max(19).default(0).describe('Label color index (0-19; WAHA requires a color — pass the current one to keep it)'),
+      session: z.string().default('default').describe('Session name'),
+    },
+    annotations: { idempotentHint: true },
+    handler: async ({ labelId, name, color, session }) => {
+      await client.put(
+        `/api/${encodeURIComponent(session)}/labels/${encodeURIComponent(labelId)}`,
+        { name, color },
+      );
+      return `Updated label ${labelId}.`;
+    },
+  });
+
+  defineTool(server, {
+    name: 'waha_delete_label',
+    description: 'Permanently delete a label from the WhatsApp account. It is removed from all chats.',
+    schema: {
       labelId: z.string().describe('Label ID'),
       session: z.string().default('default').describe('Session name'),
     },
-    async ({ labelId, session }) => {
-      try {
-        await client.delete(
-          `/api/${encodeURIComponent(session)}/labels/${encodeURIComponent(labelId)}`,
-        );
-        return {
-          content: [{ type: 'text', text: `Label ${labelId} deleted successfully.` }],
-        };
-      } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Error deleting label: ${(error as Error).message}` }],
-          isError: true,
-        };
-      }
+    annotations: { destructiveHint: true, idempotentHint: true },
+    handler: async ({ labelId, session }) => {
+      await client.delete(
+        `/api/${encodeURIComponent(session)}/labels/${encodeURIComponent(labelId)}`,
+      );
+      return `Deleted label ${labelId}.`;
     },
-  );
+  });
 
-  server.tool(
-    'waha_add_label_to_chat',
-    'Add a label to a chat',
-    {
-      labelId: z.string().describe('Label ID'),
-      chatId: z.string().describe('Chat ID to label'),
+  defineTool(server, {
+    name: 'waha_get_chat_labels',
+    description:
+      'Get the labels currently assigned to a chat. chatId like 123@c.us (person) or 123@g.us (group).',
+    schema: {
+      chatId: z.string().describe('Chat ID, e.g. 123@c.us or 123@g.us'),
       session: z.string().default('default').describe('Session name'),
     },
-    async ({ labelId, chatId, session }) => {
-      try {
-        await client.post(
-          `/api/${encodeURIComponent(session)}/labels/${encodeURIComponent(labelId)}/chats/${encodeURIComponent(chatId)}`,
-        );
-        return {
-          content: [{ type: 'text', text: `Label ${labelId} added to chat ${chatId}.` }],
-        };
-      } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Error adding label to chat: ${(error as Error).message}` }],
-          isError: true,
-        };
-      }
+    annotations: { readOnlyHint: true },
+    handler: async ({ chatId, session }) => {
+      const labels = await client.get<Label[]>(
+        `/api/${encodeURIComponent(session)}/labels/chats/${encodeURIComponent(chatId)}/`,
+      );
+      return listResponse(labels, { map: projectLabel, label: 'labels' });
     },
-  );
+  });
 
-  server.tool(
-    'waha_remove_label_from_chat',
-    'Remove a label from a chat',
-    {
-      labelId: z.string().describe('Label ID'),
-      chatId: z.string().describe('Chat ID'),
+  defineTool(server, {
+    name: 'waha_set_chat_labels',
+    description:
+      'Replace the full set of labels on a chat (pass all label ids the chat should have; an empty list clears labels). chatId like 123@c.us / 123@g.us.',
+    schema: {
+      chatId: z.string().describe('Chat ID, e.g. 123@c.us or 123@g.us'),
+      labelIds: z.array(z.string()).describe('Label IDs the chat should have (replaces existing)'),
       session: z.string().default('default').describe('Session name'),
     },
-    async ({ labelId, chatId, session }) => {
-      try {
-        await client.delete(
-          `/api/${encodeURIComponent(session)}/labels/${encodeURIComponent(labelId)}/chats/${encodeURIComponent(chatId)}`,
-        );
-        return {
-          content: [{ type: 'text', text: `Label ${labelId} removed from chat ${chatId}.` }],
-        };
-      } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Error removing label from chat: ${(error as Error).message}` }],
-          isError: true,
-        };
-      }
+    annotations: { idempotentHint: true },
+    handler: async ({ chatId, labelIds, session }) => {
+      await client.put(
+        `/api/${encodeURIComponent(session)}/labels/chats/${encodeURIComponent(chatId)}/`,
+        { labels: labelIds.map((id) => ({ id })) },
+      );
+      return `Set ${labelIds.length} label(s) on chat ${chatId}.`;
     },
-  );
+  });
+
+  defineTool(server, {
+    name: 'waha_get_chats_by_label',
+    description:
+      'List all chats tagged with a given label — e.g. retrieve every chat marked "needs-human". Get label ids with waha_get_labels.',
+    schema: {
+      labelId: z.string().describe('Label ID'),
+      session: z.string().default('default').describe('Session name'),
+    },
+    annotations: { readOnlyHint: true },
+    handler: async ({ labelId, session }) => {
+      const chats = await client.get<ChatInfo[]>(
+        `/api/${encodeURIComponent(session)}/labels/${encodeURIComponent(labelId)}/chats`,
+      );
+      return listResponse(chats, { map: projectChat, label: 'chats' });
+    },
+  });
 }
