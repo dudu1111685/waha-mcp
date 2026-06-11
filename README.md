@@ -29,6 +29,7 @@ WAHA MCP Server bridges the powerful [WAHA (WhatsApp HTTP API)](https://waha.dev
 - 🤖 **AI-Native** - Token-efficient compact responses, MCP tool annotations (read-only/destructive hints)
 - 🔒 **Secure** - Environment-based API key management, optional local-file sandbox (`WAHA_MCP_FILES_DIR`)
 - ⚡ **Fast & Reliable** - TypeScript-powered, request timeouts, typed errors, vitest suite
+- ✈️ **Telegram too** - a second MCP server (`dist/telegram/index.js`) controls your personal **Telegram** account over MTProto: 15 `tg_*` tools sharing the same core (inbox digest, conversation rendering, voice transcription, send/react/edit, media, search). See [Telegram server](#telegram-server)
 
 ---
 
@@ -454,6 +455,62 @@ mcporter call 'waha-mcp.waha_add_group_participants(
 ```bash
 mcporter call 'waha-mcp.waha_list_chats()'
 ```
+
+---
+
+## ✈️ Telegram Server
+
+The repo ships a second, independent MCP server that operates your personal
+**Telegram account** directly over MTProto (via [gramjs](https://github.com/gram-js/gramjs)) —
+no bot, no Telegram Bot API limits. It reuses the same core layer as the
+WhatsApp server (tool wrapper, compact formatting, Soniox voice transcription).
+
+### Setup
+
+```bash
+# 1. Get api_id + api_hash at https://my.telegram.org → "API development tools"
+# 2. One-time interactive sign-in (phone → code → optional 2FA password).
+#    Writes TELEGRAM_API_ID / TELEGRAM_API_HASH / TELEGRAM_SESSION into .env:
+npm run telegram:login
+```
+
+> ⚠️ `TELEGRAM_SESSION` grants **full access to the account** — treat it like a
+> password and only pass it via environment configuration.
+
+### MCP client config
+
+```json
+{
+  "mcpServers": {
+    "telegram": {
+      "command": "node",
+      "args": ["/absolute/path/to/waha-mcp/dist/telegram/index.js"],
+      "env": {
+        "TELEGRAM_API_ID": "123456",
+        "TELEGRAM_API_HASH": "...",
+        "TELEGRAM_SESSION": "...",
+        "SONIOX_API_KEY": "..."
+      }
+    }
+  }
+}
+```
+
+### Tools (15, prefixed `tg_`)
+
+| Tool | Purpose |
+|------|---------|
+| `tg_inbox` | Digest of unread chats — start here |
+| `tg_list_chats` / `tg_find_chat` / `tg_list_contacts` | Discover chats, resolve names to ids |
+| `tg_get_chat_context` | Conversation rendered for reading; voice notes transcribed inline |
+| `tg_send_text` / `tg_send_file` | Send messages/files, optional quote-reply |
+| `tg_react` / `tg_edit_message` / `tg_delete_message` | Act on messages |
+| `tg_search_messages` | Per-chat or account-wide text search |
+| `tg_get_media` / `tg_transcribe_message` | Download media, transcribe voice |
+| `tg_mark_read` / `tg_me` | Housekeeping |
+
+`chat` accepts what `tg_list_chats` returns: a numeric id (channels use the
+`-100…` form), `@username`, a `+phone` of a contact, or `me` (Saved Messages).
 
 ---
 

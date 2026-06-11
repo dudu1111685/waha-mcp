@@ -4,20 +4,29 @@
   "description": "MCP server for WAHA (WhatsApp HTTP API)",
   "main": "dist/index.js",
   "bin": {
-    "waha-mcp": "dist/index.js"
+    "waha-mcp": "dist/index.js",
+    "telegram-mcp": "dist/telegram/index.js"
   },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
+    "start:telegram": "node dist/telegram/index.js",
+    "telegram:login": "npm run build && node --env-file-if-exists=.env dist/telegram/login.js",
     "dev": "tsc --watch",
     "test": "node --experimental-vm-modules node_modules/.bin/vitest run",
     "test:watch": "node --experimental-vm-modules node_modules/.bin/vitest"
   },
-  "keywords": ["mcp", "whatsapp", "waha", "claude"],
+  "keywords": [
+    "mcp",
+    "whatsapp",
+    "waha",
+    "claude"
+  ],
   "license": "MIT",
   "type": "module",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
+    "telegram": "^2.26.22",
     "zod": "^3.25.0"
   },
   "devDependencies": {

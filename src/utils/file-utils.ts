@@ -77,7 +77,7 @@ export function mimeFromPath(pathOrUrl: string): string | undefined {
  * only files inside that directory may be read. This blocks prompt-injected
  * exfiltration of arbitrary local files (e.g. SSH keys) via send tools.
  */
-function assertAllowedPath(filePath: string): void {
+export function assertAllowedPath(filePath: string): void {
   const baseDir = process.env.WAHA_MCP_FILES_DIR;
   if (!baseDir) return;
   const resolvedBase = resolve(baseDir);

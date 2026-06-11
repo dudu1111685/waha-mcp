@@ -105,7 +105,48 @@ hermes
 Expected: tool list shows the selected `waha_*` tools; auth status `WORKING`;
 inbox returns chats with previews.
 
-## 6. Autonomy patterns
+## 6. Telegram (same repo, second server)
+
+This repo also ships a **Telegram MTProto MCP server** (`dist/telegram/index.js`)
+that gives Hermes the same powers over your personal **Telegram** account:
+inbox digest, conversation reading with inline voice transcription, send/reply/
+react/edit, media download, search. 15 tools, all prefixed `tg_`.
+
+One-time setup:
+
+1. Create API credentials at <https://my.telegram.org> → *API development tools*
+   (any app name works; you get `api_id` + `api_hash`).
+2. Sign in once and generate a session string:
+
+   ```bash
+   cd /home/shlomo/waha-mcp
+   npm run telegram:login
+   ```
+
+   It prompts for the phone number, the code Telegram sends to your app, and a
+   2FA password if set — then writes `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`
+   and `TELEGRAM_SESSION` into the repo `.env`.
+3. Register the server in `~/.hermes/config.yaml`:
+
+   ```yaml
+   mcp_servers:
+     telegram:
+       command: "node"
+       args: ["/home/shlomo/waha-mcp/dist/telegram/index.js"]
+       env:
+         TELEGRAM_API_ID: "${TELEGRAM_API_ID}"
+         TELEGRAM_API_HASH: "${TELEGRAM_API_HASH}"
+         TELEGRAM_SESSION: "${TELEGRAM_SESSION}"
+         SONIOX_API_KEY: "${SONIOX_API_KEY}"
+   ```
+
+   and add the three values to `~/.hermes/.env`. **`TELEGRAM_SESSION` is a
+   full-account credential — treat it exactly like a password.**
+
+Core loop tools: `tg_inbox` → `tg_get_chat_context` → `tg_send_text`
+(+ `tg_find_chat`, `tg_transcribe_message`, `tg_get_media`, `tg_react`).
+
+## 7. Autonomy patterns
 
 - **Scheduled triage**: Hermes has a built-in `cronjob` tool — e.g. "every 30
   minutes run waha_inbox and message me if anything needs attention". Note:
