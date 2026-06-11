@@ -80,18 +80,133 @@ describe('WAHAClient.request', () => {
   });
 
   it('parses JSON error bodies into WAHAApiError with statusCode', async () => {
+    // Realistic one-read body: only text() yields the payload (json() would
+    // consume the stream) — guards against the double-consume bug.
     fetchMock.mockResolvedValue(
       mockResponse({
         ok: false,
         status: 422,
-        json: async () => ({ statusCode: 422, message: 'chatId is invalid' }),
+        json: async () => {
+          throw new TypeError('Body is unusable: Body has already been read');
+        },
+        text: async () => JSON.stringify({ statusCode: 422, message: 'chatId is invalid' }),
       }),
     );
 
     const err = await makeClient().get('/api/chats').catch((e: unknown) => e);
     expect(err).toBeInstanceOf(WAHAApiError);
     expect((err as WAHAApiError).statusCode).toBe(422);
-    expect((err as WAHAApiError).message).toBe('WAHA API error (422): chatId is invalid');
+    expect((err as WAHAApiError).message).toBe(
+      'WAHA API error (422) on GET /api/chats: chatId is invalid',
+    );
+  });
+
+  it('appends available sessions when a session-scoped call fails with 422 on an unknown session', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/sessions')) {
+        return mockResponse({
+          json: async () => [{ name: 'shlomo_erentroy', status: 'WORKING' }],
+        });
+      }
+      return mockResponse({
+        ok: false,
+        status: 422,
+        text: async () => JSON.stringify({ statusCode: 422, message: 'Session not found' }),
+      });
+    });
+
+    const err = await makeClient().get('/api/default/chats/overview').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(WAHAApiError);
+    const message = (err as WAHAApiError).message;
+    expect(message).toContain('on GET /api/default/chats/overview');
+    expect(message).toContain("Session 'default' does not exist");
+    expect(message).toContain("'shlomo_erentroy'");
+    expect(message).toContain('`session` argument');
+  });
+
+  it('explains a session that exists but is not WORKING', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/sessions')) {
+        return mockResponse({
+          json: async () => [{ name: 'default', status: 'SCAN_QR_CODE' }],
+        });
+      }
+      return mockResponse({
+        ok: false,
+        status: 422,
+        text: async () => JSON.stringify({ statusCode: 422, message: 'Session not ready' }),
+      });
+    });
+
+    const err = await makeClient().get('/api/default/chats/overview').catch((e: unknown) => e);
+    const message = (err as WAHAApiError).message;
+    expect(message).toContain("in state 'SCAN_QR_CODE'");
+    expect(message).toContain('must be WORKING');
+  });
+
+  it('emits a session hint for session-management endpoints (/api/sessions/{name}/...)', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.endsWith('/api/sessions') || url.includes('/api/sessions?')) {
+        return mockResponse({ json: async () => [{ name: 'real', status: 'WORKING' }] });
+      }
+      return mockResponse({
+        ok: false,
+        status: 422,
+        text: async () => JSON.stringify({ message: 'Session not found' }),
+      });
+    });
+
+    const err = await makeClient().post('/api/sessions/ghost/start').catch((e: unknown) => e);
+    const message = (err as WAHAApiError).message;
+    expect(message).toContain("Session 'ghost' does not exist");
+    expect(message).toContain("'real'");
+  });
+
+  it('does NOT treat global roots like /api/contacts/* as a session', async () => {
+    fetchMock.mockResolvedValue(
+      mockResponse({
+        ok: false,
+        status: 422,
+        text: async () => JSON.stringify({ message: 'session param is required' }),
+      }),
+    );
+
+    const err = await makeClient().get('/api/contacts/all').catch((e: unknown) => e);
+    expect((err as WAHAApiError).message).toBe(
+      'WAHA API error (422) on GET /api/contacts/all: session param is required',
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1); // no /api/sessions lookup
+  });
+
+  it('still errors cleanly when the session-hint lookup itself fails', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/sessions')) throw new TypeError('fetch failed');
+      return mockResponse({
+        ok: false,
+        status: 404,
+        text: async () => JSON.stringify({ message: 'Not found' }),
+      });
+    });
+
+    const err = await makeClient().get('/api/ghost/chats').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(WAHAApiError);
+    expect((err as WAHAApiError).message).toBe(
+      'WAHA API error (404) on GET /api/ghost/chats: Not found',
+    );
+  });
+
+  it('maps 401 to an API-key hint without a session lookup', async () => {
+    fetchMock.mockResolvedValue(
+      mockResponse({
+        ok: false,
+        status: 401,
+        text: async () => JSON.stringify({ message: 'Unauthorized' }),
+      }),
+    );
+
+    const err = await makeClient().get('/api/default/chats').catch((e: unknown) => e);
+    expect((err as WAHAApiError).message).toContain('check WAHA_API_KEY');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('falls back to text body when error body is not JSON', async () => {
@@ -109,7 +224,9 @@ describe('WAHAClient.request', () => {
     const err = await makeClient().get('/api/chats').catch((e: unknown) => e);
     expect(err).toBeInstanceOf(WAHAApiError);
     expect((err as WAHAApiError).statusCode).toBe(502);
-    expect((err as WAHAApiError).message).toBe('WAHA API error (502): Bad Gateway from nginx');
+    expect((err as WAHAApiError).message).toBe(
+      'WAHA API error (502) on GET /api/chats: Bad Gateway from nginx',
+    );
   });
 
   it('falls back to "HTTP <status>" when error body is empty', async () => {
@@ -125,7 +242,7 @@ describe('WAHAClient.request', () => {
     );
 
     const err = await makeClient().get('/api/chats').catch((e: unknown) => e);
-    expect((err as WAHAApiError).message).toBe('WAHA API error (500): HTTP 500');
+    expect((err as WAHAApiError).message).toBe('WAHA API error (500) on GET /api/chats: HTTP 500');
   });
 
   it('maps TimeoutError rejections to a friendly timeout message without statusCode', async () => {

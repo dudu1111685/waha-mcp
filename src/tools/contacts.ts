@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { sessionParam } from '../utils/session.js';
 import { WAHAClient } from '../client.js';
 import { ContactInfo, ContactExistsResult } from '../types.js';
 import { defineTool } from '../utils/define-tool.js';
@@ -11,7 +12,7 @@ export function registerContactTools(server: McpServer, client: WAHAClient): voi
     description:
       'List saved contacts (paginated). Use to find a contact id (like 123@c.us) by browsing; for a known id use waha_get_contact instead.',
     schema: {
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
       limit: z.number().int().min(1).max(200).default(50).describe('Max results'),
       offset: z.number().int().min(0).default(0).describe('Pagination offset'),
       sortBy: z.enum(['id', 'name']).optional().describe('Sort field'),
@@ -33,7 +34,7 @@ export function registerContactTools(server: McpServer, client: WAHAClient): voi
     description: 'Get info about one contact by id (e.g. "1234567890@c.us").',
     schema: {
       contactId: z.string().describe('Contact ID (e.g. "1234567890@c.us")'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { readOnlyHint: true },
     handler: async ({ contactId, session }) => {
@@ -49,7 +50,7 @@ export function registerContactTools(server: McpServer, client: WAHAClient): voi
       'Check if a phone number is registered on WhatsApp and get its chatId. Always use this to verify unknown numbers BEFORE a first-time send — messaging unregistered numbers risks account bans.',
     schema: {
       phone: z.string().describe('Phone number with country code, digits only (e.g. "972501234567")'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { readOnlyHint: true },
     handler: async ({ phone, session }) => {
@@ -72,7 +73,7 @@ export function registerContactTools(server: McpServer, client: WAHAClient): voi
       chatId: z.string().describe('Contact chat ID (e.g. "1234567890@c.us")'),
       firstName: z.string().describe('Contact first name'),
       lastName: z.string().optional().describe('Contact last name'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { idempotentHint: true },
     handler: async ({ chatId, firstName, lastName, session }) => {
@@ -89,7 +90,7 @@ export function registerContactTools(server: McpServer, client: WAHAClient): voi
     description: 'Get a contact\'s "about" status text (the short bio under their name).',
     schema: {
       contactId: z.string().describe('Contact ID (e.g. "1234567890@c.us")'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { readOnlyHint: true },
     handler: async ({ contactId, session }) => {
@@ -110,7 +111,7 @@ export function registerContactTools(server: McpServer, client: WAHAClient): voi
     schema: {
       contactId: z.string().describe('Contact ID (e.g. "1234567890@c.us")'),
       block: z.boolean().default(true).describe('true to block, false to unblock'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { idempotentHint: true },
     handler: async ({ contactId, block, session }) => {
@@ -126,7 +127,7 @@ export function registerContactTools(server: McpServer, client: WAHAClient): voi
       'Get the profile picture URL of a contact or group (id like 123@c.us / 123@g.us). May be empty due to privacy settings.',
     schema: {
       contactId: z.string().describe('Contact or group ID'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { readOnlyHint: true },
     handler: async ({ contactId, session }) => {

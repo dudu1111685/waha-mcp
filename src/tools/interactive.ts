@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { sessionParam } from '../utils/session.js';
 import { WAHAClient } from '../client.js';
 import { SendResult, WAMessage } from '../types.js';
 import { defineTool } from '../utils/define-tool.js';
@@ -19,7 +20,7 @@ export function registerInteractiveTools(server: McpServer, client: WAHAClient):
     schema: {
       question: z.string().describe('The question to send to the user'),
       chatId: z.string().describe('Chat ID to send the question to (e.g. "123@c.us" or "123@g.us")'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
       prefix: z.string().default('🤖 ').describe('Short prefix prepended to the question text'),
     },
     handler: async ({ question, chatId, session, prefix }) => {
@@ -60,7 +61,7 @@ export function registerInteractiveTools(server: McpServer, client: WAHAClient):
     annotations: { readOnlyHint: true },
     schema: {
       chatId: z.string().describe('Chat ID the question was sent to (from waha_ask_user result)'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
       sinceTimestamp: z
         .number()
         .int()

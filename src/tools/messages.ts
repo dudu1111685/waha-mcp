@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { sessionParam } from '../utils/session.js';
 import { WAHAClient } from '../client.js';
 import { SendResult, WAMessage } from '../types.js';
 import { fileToBase64, mimeFromPath } from '../utils/file-utils.js';
@@ -38,7 +39,7 @@ export function registerMessageTools(server: McpServer, client: WAHAClient): voi
     schema: {
       chatId: z.string().describe('Chat ID (e.g. "1234567890@c.us" for users, "1234567890@g.us" for groups)'),
       text: z.string().describe('Message text'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
       replyTo: z.string().optional().describe('Message ID to reply to'),
       mentions: z.array(z.string()).optional().describe('User IDs to mention (e.g. ["1234567890@c.us"]) or ["all"] for everyone'),
       linkPreview: z.boolean().optional().describe('Enable link preview generation'),
@@ -83,7 +84,7 @@ export function registerMessageTools(server: McpServer, client: WAHAClient): voi
       imagePath: z.string().optional().describe('Local file path (e.g., "/tmp/photo.jpg")'),
       imageUrl: z.string().optional().describe('URL of the image to send'),
       caption: z.string().optional().describe('Image caption'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
       replyTo: z.string().optional().describe('Message ID to reply to'),
     },
     handler: async ({ chatId, imagePath, imageUrl, caption, session, replyTo }) => {
@@ -107,7 +108,7 @@ export function registerMessageTools(server: McpServer, client: WAHAClient): voi
       videoUrl: z.string().optional().describe('URL of the video to send (MP4 format preferred)'),
       caption: z.string().optional().describe('Video caption'),
       convert: z.boolean().default(true).describe('Auto-convert to WhatsApp format'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     handler: async ({ chatId, videoPath, videoUrl, caption, convert, session }) => {
       const fileObj = await buildFileObject(videoPath, videoUrl, 'videoPath', 'videoUrl');
@@ -128,7 +129,7 @@ export function registerMessageTools(server: McpServer, client: WAHAClient): voi
       audioPath: z.string().optional().describe('Local file path (e.g., "/tmp/voice.mp3")'),
       audioUrl: z.string().optional().describe('URL of the audio file (OGG/Opus format preferred)'),
       convert: z.boolean().default(true).describe('Auto-convert to Opus format (recommended for MP3/WAV)'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     handler: async ({ chatId, audioPath, audioUrl, convert, session }) => {
       const fileObj = await buildFileObject(audioPath, audioUrl, 'audioPath', 'audioUrl');
@@ -148,7 +149,7 @@ export function registerMessageTools(server: McpServer, client: WAHAClient): voi
       mimetype: z.string().optional().describe('File MIME type (auto-detected if omitted)'),
       filename: z.string().optional().describe('Display filename (auto-detected if using filePath)'),
       caption: z.string().optional().describe('File caption'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     handler: async ({ chatId, filePath, fileUrl, mimetype, filename, caption, session }) => {
       if (!filePath && !fileUrl) {
@@ -197,7 +198,7 @@ export function registerMessageTools(server: McpServer, client: WAHAClient): voi
       latitude: z.number().describe('Latitude coordinate'),
       longitude: z.number().describe('Longitude coordinate'),
       title: z.string().optional().describe('Location title/name'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     handler: async ({ chatId, latitude, longitude, title, session }) => {
       const body: Record<string, unknown> = { session, chatId, latitude, longitude };
@@ -215,7 +216,7 @@ export function registerMessageTools(server: McpServer, client: WAHAClient): voi
     schema: {
       chatId: z.string().describe('Chat ID (e.g. "123@c.us" / "123@g.us")'),
       contactsId: z.array(z.string()).describe('Contact IDs to share (e.g. ["1234567890@c.us"])'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     handler: async ({ chatId, contactsId, session }) => {
       await throttleSend(chatId);
@@ -232,7 +233,7 @@ export function registerMessageTools(server: McpServer, client: WAHAClient): voi
       pollName: z.string().describe('Poll question'),
       options: z.array(z.string()).min(2).describe('Poll options (at least 2)'),
       multipleAnswers: z.boolean().default(false).describe('Allow multiple answers'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     handler: async ({ chatId, pollName, options, multipleAnswers, session }) => {
       await throttleSend(chatId);
@@ -251,7 +252,7 @@ export function registerMessageTools(server: McpServer, client: WAHAClient): voi
     schema: {
       messageId: z.string().describe('Full message ID to react to'),
       reaction: z.string().describe('Emoji reaction (e.g. "❤️", "👍"). Empty string to remove reaction.'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { idempotentHint: true },
     handler: async ({ messageId, reaction, session }) => {
@@ -265,7 +266,7 @@ export function registerMessageTools(server: McpServer, client: WAHAClient): voi
     description: 'List messages in a chat (newest first) with optional fromMe/timestamp/ack filters. Use waha_get_message for a single message by id.',
     schema: {
       chatId: z.string().describe('Chat ID (e.g. "123@c.us" / "123@g.us")'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
       limit: z.number().int().min(1).max(100).default(20).describe('Max messages to retrieve'),
       offset: z.number().int().min(0).default(0).describe('Pagination offset'),
       downloadMedia: z.boolean().optional().describe('Include media download URLs'),
@@ -299,7 +300,7 @@ export function registerMessageTools(server: McpServer, client: WAHAClient): voi
     schema: {
       chatId: z.string().describe('Chat ID (e.g. "123@c.us" / "123@g.us")'),
       messageId: z.string().describe('Full message ID'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
       downloadMedia: z.boolean().default(false).describe('Include media download URL'),
     },
     annotations: { readOnlyHint: true },
@@ -318,7 +319,7 @@ export function registerMessageTools(server: McpServer, client: WAHAClient): voi
     schema: {
       chatId: z.string().describe('Chat ID (e.g. "123@c.us" / "123@g.us")'),
       messageId: z.string().describe('Message ID to delete'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { destructiveHint: true },
     handler: async ({ chatId, messageId, session }) => {
@@ -336,7 +337,7 @@ export function registerMessageTools(server: McpServer, client: WAHAClient): voi
       chatId: z.string().describe('Chat ID (e.g. "123@c.us" / "123@g.us")'),
       messageId: z.string().describe('Message ID to edit'),
       text: z.string().describe('New message text'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     handler: async ({ chatId, messageId, text, session }) => {
       await client.put(
@@ -352,7 +353,7 @@ export function registerMessageTools(server: McpServer, client: WAHAClient): voi
     description: 'Mark messages in a chat as read (send "seen"). Marks the whole chat unless specific messageIds are given.',
     schema: {
       chatId: z.string().describe('Chat ID (e.g. "123@c.us" / "123@g.us")'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
       messageIds: z.array(z.string()).optional().describe('Specific message IDs to mark as read (optional, marks all if omitted)'),
     },
     annotations: { idempotentHint: true },
@@ -372,7 +373,7 @@ export function registerMessageTools(server: McpServer, client: WAHAClient): voi
       chatId: z.string().describe('Chat ID (e.g. "123@c.us" / "123@g.us")'),
       messageId: z.string().describe('Message ID'),
       star: z.boolean().default(true).describe('true to star, false to unstar'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { idempotentHint: true },
     handler: async ({ chatId, messageId, star, session }) => {
@@ -388,7 +389,7 @@ export function registerMessageTools(server: McpServer, client: WAHAClient): voi
       chatId: z.string().describe('Chat ID (e.g. "123@c.us" / "123@g.us")'),
       messageId: z.string().describe('Message ID to pin'),
       duration: z.number().int().default(604800).describe('Pin duration in seconds: 86400 (24h), 604800 (7d) or 2592000 (30d)'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { idempotentHint: true },
     handler: async ({ chatId, messageId, duration, session }) => {
@@ -406,7 +407,7 @@ export function registerMessageTools(server: McpServer, client: WAHAClient): voi
     schema: {
       chatId: z.string().describe('Chat ID (e.g. "123@c.us" / "123@g.us")'),
       messageId: z.string().describe('Message ID to unpin'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { idempotentHint: true },
     handler: async ({ chatId, messageId, session }) => {
@@ -423,7 +424,7 @@ export function registerMessageTools(server: McpServer, client: WAHAClient): voi
     schema: {
       toChatId: z.string().describe('Destination chat ID (e.g. "123@c.us" / "123@g.us")'),
       messageId: z.string().describe('Full message ID to forward'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     handler: async ({ toChatId, messageId, session }) => {
       await throttleSend(toChatId);

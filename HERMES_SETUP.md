@@ -38,6 +38,7 @@ mcp_servers:
     env:
       WAHA_API_KEY: "${WAHA_API_KEY}"
       WAHA_URL: "http://localhost:3001"
+      WAHA_DEFAULT_SESSION: "default"
       SONIOX_API_KEY: "${SONIOX_API_KEY}"
       USER_WHATSAPP_CHAT_ID: "<your-number>@c.us"
 ```
@@ -51,6 +52,12 @@ SONIOX_API_KEY=your-soniox-key   # optional — enables voice transcription
 
 Note: Hermes passes MCP servers only a safe baseline environment plus what you
 declare in `env` — undeclared variables will NOT reach the server.
+
+`WAHA_DEFAULT_SESSION` sets the session every tool defaults to. For a
+single-account setup, set it to your session name (e.g. `default`). If you
+connect multiple WhatsApp accounts and want each tool call to require an
+explicit `session` parameter, omit it. Call `waha_list_sessions` to see which
+sessions are available.
 
 ## 3. Trim the tool list (recommended)
 

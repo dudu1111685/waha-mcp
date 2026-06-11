@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { sessionParam } from '../utils/session.js';
 import { WAHAApiError, WAHAClient } from '../client.js';
 import { defineTool } from '../utils/define-tool.js';
 
@@ -8,7 +9,7 @@ export function registerAuthTools(server: McpServer, client: WAHAClient): void {
     name: 'waha_get_qr_code',
     description: 'Get the WhatsApp login QR code for a session in SCAN_QR_CODE state. format=image (default) returns a scannable QR image; format=raw returns the raw QR string value.',
     schema: {
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
       format: z.enum(['raw', 'image']).default('image').describe('"image" returns a scannable QR image, "raw" returns the QR string value'),
     },
     annotations: { readOnlyHint: true },
@@ -46,7 +47,7 @@ export function registerAuthTools(server: McpServer, client: WAHAClient): void {
     name: 'waha_request_pairing_code',
     description: 'Request a pairing code for phone-number authentication (alternative to QR scan). The user enters the returned code in WhatsApp on their phone.',
     schema: {
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
       phoneNumber: z.string().describe('Phone number in international format without + (e.g. "12132132130")'),
     },
     handler: async ({ session, phoneNumber }) => {
@@ -62,7 +63,7 @@ export function registerAuthTools(server: McpServer, client: WAHAClient): void {
     name: 'waha_check_auth_status',
     description: 'Check the authentication status of a WhatsApp session. Use before fetching a QR code or sending messages.',
     schema: {
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { readOnlyHint: true },
     handler: async ({ session }) => {

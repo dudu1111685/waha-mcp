@@ -1,7 +1,7 @@
 ---
 name: whatsapp-assistant
 description: Operate the owner's personal WhatsApp account through the waha_* MCP tools — triage the inbox, read conversations with voice notes transcribed, reply like a human, send messages and media, and act on what people wrote. Use this skill whenever the user mentions WhatsApp, asks to read or answer messages from a person or group, asks "what did X write/say", wants to send someone a message or file, mentions voice notes, or asks to check, summarize, or monitor chats — even if they never say the word "WhatsApp" but waha tools are available.
-version: 1.2.0
+version: 1.3.0
 metadata:
   hermes:
     tags: [whatsapp, messaging, waha, assistant]
@@ -37,8 +37,12 @@ transcription (verified end-to-end on real Hebrew speech).
 | First-ever message to a raw phone number | `waha_check_number_exists` first | sending blind (ban signal) |
 | Flag a chat for the owner | `waha_mark_unread` / `waha_set_chat_labels` | leaving it untracked |
 
-Session is `default` unless told otherwise. The owner's own chat ID comes from
-the `USER_WHATSAPP_CHAT_ID` env var of the MCP server, or ask once and remember.
+The session to use is set by `WAHA_DEFAULT_SESSION` on the MCP server. If that
+variable is set (typical single-account setup), every tool will use it
+automatically and you can omit `session`. If it is not set, `session` is
+**required** on every call — pass the exact session name, which you can look up
+with `waha_list_sessions`. The owner's own chat ID comes from the
+`USER_WHATSAPP_CHAT_ID` env var of the MCP server, or ask once and remember.
 
 ## Core loop: read → answer → act
 
@@ -72,9 +76,11 @@ the `USER_WHATSAPP_CHAT_ID` env var of the MCP server, or ask once and remember.
   data, and leaks are irreversible.
 - **Pace**: one message per chat per turn unless asked otherwise; no mass
   sends. Bursts of messages are the clearest bot fingerprint there is.
-  The MCP server enforces a throttle (3-8s jitter between sends, ≤8/min,
-  group mutations ≥2min apart) — when a tool answers "Rate limit: wait Ns",
-  do other work and retry later; never hammer.
+  The MCP server has an optional throttle (`WAHA_THROTTLE=1`); it is off by
+  default. Even without the throttle, avoid rapid bulk sends — WhatsApp's
+  server-side anti-spam is engine-independent. If the throttle is enabled and
+  a tool answers "Rate limit: wait Ns", do other work and retry later; never
+  hammer.
 - **Group operations are the riskiest calls**: WhatsApp tolerates roughly 2
   group mutations per 10 minutes. Never chain create+picture+invite+settings
   in one burst — that exact pattern gets the linked device removed.

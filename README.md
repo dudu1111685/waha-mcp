@@ -68,11 +68,17 @@ Create a `.env` file or export variables:
 
 ```bash
 export WAHA_API_KEY="your-api-key-here"
-export WAHA_URL="http://localhost:3001"      # Optional, defaults to localhost:3001
-export SONIOX_API_KEY="your-soniox-key"      # Optional — enables voice note transcription
-export WAHA_TIMEOUT_MS="30000"               # Optional — WAHA request timeout
-export WAHA_MCP_FILES_DIR="/tmp/waha-mcp"    # Optional — restrict local-file reads to this dir
+export WAHA_URL="http://localhost:3001"         # Optional, defaults to localhost:3001
+export WAHA_DEFAULT_SESSION="default"           # Optional — see Session policy below
+export SONIOX_API_KEY="your-soniox-key"         # Optional — enables voice note transcription
+export WAHA_TIMEOUT_MS="30000"                  # Optional — WAHA request timeout
+export WAHA_MCP_FILES_DIR="/tmp/waha-mcp"       # Optional — restrict local-file reads to this dir
+export WAHA_THROTTLE=1                          # Optional — enable anti-ban send pacing (off by default)
 ```
+
+**Session policy:** `WAHA_DEFAULT_SESSION` sets the default session name for every tool call. Set it to your session name (e.g. `default`) for a single-account setup. If you leave it unset, the `session` parameter becomes **required** on every tool call — the safe choice when multiple WhatsApp accounts are connected, since a silent default could send from the wrong account. Call `waha_list_sessions` to enumerate available sessions.
+
+**Anti-ban throttle:** off by default since the GOWS engine fixed `device_removed` disconnects. Set `WAHA_THROTTLE=1` to enable pacing (3–8s jitter between sends, max 8/min, group ops spaced 120s). High-volume or bursty sends to many recipients are still risky regardless of engine — enable throttling for those use cases.
 
 ---
 
@@ -93,12 +99,15 @@ Add to `claude_desktop_config.json`:
       "args": ["/absolute/path/to/waha-mcp/dist/index.js"],
       "env": {
         "WAHA_API_KEY": "your-api-key-here",
-        "WAHA_URL": "http://localhost:3001"
+        "WAHA_URL": "http://localhost:3001",
+        "WAHA_DEFAULT_SESSION": "default"
       }
     }
   }
 }
 ```
+
+> **Session note:** `WAHA_DEFAULT_SESSION` makes every tool default to that session. Omit it only if you connect multiple WhatsApp accounts and want the tool to require an explicit `session` on every call.
 
 ### Cline / VS Code
 
@@ -111,7 +120,8 @@ Add to your Cline MCP settings (`~/.vscode/mcp.json` or workspace settings):
       "command": "node",
       "args": ["/absolute/path/to/waha-mcp/dist/index.js"],
       "env": {
-        "WAHA_API_KEY": "your-api-key-here"
+        "WAHA_API_KEY": "your-api-key-here",
+        "WAHA_DEFAULT_SESSION": "default"
       }
     }
   }
@@ -135,6 +145,7 @@ Instead of the agent stopping when it needs user input, it can ask questions via
       "args": ["/path/to/waha-mcp/dist/index.js"],
       "env": {
         "WAHA_API_KEY": "your-key",
+        "WAHA_DEFAULT_SESSION": "default",
         "USER_WHATSAPP_CHAT_ID": "1234567890@c.us"
       }
     }

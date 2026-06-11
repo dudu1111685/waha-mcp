@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { sessionParam } from '../utils/session.js';
 import { WAHAClient } from '../client.js';
 import { GroupInfo } from '../types.js';
 import { defineTool } from '../utils/define-tool.js';
@@ -30,7 +31,7 @@ export function registerGroupTools(server: McpServer, client: WAHAClient): void 
     schema: {
       name: z.string().describe('Group name/subject'),
       participants: z.array(z.string()).describe('Participant IDs to add (e.g. ["1234567890@c.us"])'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     handler: async ({ name, participants, session }) => {
       await throttleGroupOp();
@@ -51,7 +52,7 @@ export function registerGroupTools(server: McpServer, client: WAHAClient): void 
     name: 'waha_list_groups',
     description: 'List WhatsApp groups the account is in. Participants are excluded by default to keep responses small — set includeParticipants=true only if you need member counts.',
     schema: {
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
       limit: z.number().int().min(1).max(100).default(50).describe('Max results'),
       offset: z.number().int().min(0).default(0).describe('Pagination offset'),
       includeParticipants: z.boolean().default(false).describe('Include the participants list (heavier payload)'),
@@ -75,7 +76,7 @@ export function registerGroupTools(server: McpServer, client: WAHAClient): void 
     description: 'Get detailed info about one group by ID (e.g. "1234567890@g.us").',
     schema: {
       groupId: z.string().describe('Group ID (e.g. "1234567890@g.us")'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { readOnlyHint: true },
     handler: async ({ groupId, session }) => {
@@ -91,7 +92,7 @@ export function registerGroupTools(server: McpServer, client: WAHAClient): void 
     description: 'List the participants of a group with their roles (participant/admin/superadmin).',
     schema: {
       groupId: z.string().describe('Group ID (e.g. "1234567890@g.us")'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { readOnlyHint: true },
     handler: async ({ groupId, session }) => {
@@ -108,7 +109,7 @@ export function registerGroupTools(server: McpServer, client: WAHAClient): void 
     schema: {
       groupId: z.string().describe('Group ID'),
       participants: z.array(z.string()).describe('Participant IDs to add (e.g. ["1234567890@c.us"])'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     handler: async ({ groupId, participants, session }) => {
       await throttleGroupOp();
@@ -126,7 +127,7 @@ export function registerGroupTools(server: McpServer, client: WAHAClient): void 
     schema: {
       groupId: z.string().describe('Group ID'),
       participants: z.array(z.string()).describe('Participant IDs to remove'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { destructiveHint: true },
     handler: async ({ groupId, participants, session }) => {
@@ -145,7 +146,7 @@ export function registerGroupTools(server: McpServer, client: WAHAClient): void 
     schema: {
       groupId: z.string().describe('Group ID'),
       participants: z.array(z.string()).describe('Participant IDs to promote'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     handler: async ({ groupId, participants, session }) => {
       await throttleGroupOp();
@@ -163,7 +164,7 @@ export function registerGroupTools(server: McpServer, client: WAHAClient): void 
     schema: {
       groupId: z.string().describe('Group ID'),
       participants: z.array(z.string()).describe('Participant IDs to demote'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     handler: async ({ groupId, participants, session }) => {
       await throttleGroupOp();
@@ -181,7 +182,7 @@ export function registerGroupTools(server: McpServer, client: WAHAClient): void 
     schema: {
       groupId: z.string().describe('Group ID'),
       subject: z.string().describe('New group name'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { idempotentHint: true },
     handler: async ({ groupId, subject, session }) => {
@@ -200,7 +201,7 @@ export function registerGroupTools(server: McpServer, client: WAHAClient): void 
     schema: {
       groupId: z.string().describe('Group ID'),
       description: z.string().describe('New group description'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { idempotentHint: true },
     handler: async ({ groupId, description, session }) => {
@@ -220,7 +221,7 @@ export function registerGroupTools(server: McpServer, client: WAHAClient): void 
       groupId: z.string().describe('Group ID'),
       imagePath: z.string().optional().describe('Local file path (e.g. "/tmp/photo.jpg")'),
       imageUrl: z.string().optional().describe('URL of the image to set as group picture'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { idempotentHint: true },
     handler: async ({ groupId, imagePath, imageUrl, session }) => {
@@ -253,7 +254,7 @@ export function registerGroupTools(server: McpServer, client: WAHAClient): void 
       groupId: z.string().describe('Group ID (e.g. "1234567890@g.us")'),
       messagesAdminOnly: z.boolean().optional().describe('true = only admins can send messages; false = everyone'),
       infoAdminOnly: z.boolean().optional().describe('true = only admins can edit group info; false = everyone'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { idempotentHint: true },
     handler: async ({ groupId, messagesAdminOnly, infoAdminOnly, session }) => {
@@ -279,7 +280,7 @@ export function registerGroupTools(server: McpServer, client: WAHAClient): void 
     description: 'Leave a WhatsApp group. You cannot rejoin without a new invite, so confirm before calling.',
     schema: {
       groupId: z.string().describe('Group ID'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { destructiveHint: true },
     handler: async ({ groupId, session }) => {
@@ -296,7 +297,7 @@ export function registerGroupTools(server: McpServer, client: WAHAClient): void 
     description: 'Get the current invite code/link for a group. Requires admin rights.',
     schema: {
       groupId: z.string().describe('Group ID'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { readOnlyHint: true },
     handler: async ({ groupId, session }) => {
@@ -314,7 +315,7 @@ export function registerGroupTools(server: McpServer, client: WAHAClient): void 
     description: 'Revoke the current group invite link and generate a new one — the old link stops working permanently.',
     schema: {
       groupId: z.string().describe('Group ID'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     handler: async ({ groupId, session }) => {
       await throttleGroupOp();
@@ -330,7 +331,7 @@ export function registerGroupTools(server: McpServer, client: WAHAClient): void 
     description: 'Join a group via invite — accepts a full https://chat.whatsapp.com/... URL or just the code. Use waha_preview_group_invite first to inspect the group.',
     schema: {
       code: z.string().describe('Invite code or full invite URL'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     handler: async ({ code, session }) => {
       await throttleGroupOp();
@@ -347,7 +348,7 @@ export function registerGroupTools(server: McpServer, client: WAHAClient): void 
     description: 'Preview a group from an invite code or full invite URL WITHOUT joining it. Use before waha_join_group.',
     schema: {
       code: z.string().describe('Invite code or full invite URL'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { readOnlyHint: true },
     handler: async ({ code, session }) => {

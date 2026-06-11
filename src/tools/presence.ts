@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { sessionParam } from '../utils/session.js';
 import { WAHAApiError, WAHAClient } from '../client.js';
 import { PresenceData } from '../types.js';
 import { defineTool } from '../utils/define-tool.js';
@@ -25,7 +26,7 @@ export function registerPresenceTools(server: McpServer, client: WAHAClient): vo
     description: 'Set your own global presence to online or offline. Use before/after sending to appear natural.',
     schema: {
       presence: z.enum(['online', 'offline']).describe('Presence status to set'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { idempotentHint: true },
     handler: async ({ presence, session }) => {
@@ -39,7 +40,7 @@ export function registerPresenceTools(server: McpServer, client: WAHAClient): vo
     description: 'Subscribe to presence updates for a chat/contact (chatId like 123@c.us). Required on some engines before waha_get_presence returns data.',
     schema: {
       chatId: z.string().describe('Chat/contact ID (e.g. "123@c.us")'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { idempotentHint: true },
     handler: async ({ chatId, session }) => {
@@ -55,7 +56,7 @@ export function registerPresenceTools(server: McpServer, client: WAHAClient): vo
     description: 'Get last known presence (online/offline/typing, last seen) of a contact or group participants. Call waha_subscribe_presence first if no data is returned. chatId like 123@c.us.',
     schema: {
       chatId: z.string().describe('Chat/contact ID (e.g. "123@c.us")'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { readOnlyHint: true },
     handler: async ({ chatId, session }) => {
@@ -87,7 +88,7 @@ export function registerPresenceTools(server: McpServer, client: WAHAClient): vo
     description: 'Show a typing indicator in a chat (chatId like 123@c.us / 123@g.us). Pair with waha_stop_typing before sending the message.',
     schema: {
       chatId: z.string().describe('Chat ID (e.g. "123@c.us" or "123@g.us")'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { idempotentHint: true },
     handler: async ({ chatId, session }) => {
@@ -101,7 +102,7 @@ export function registerPresenceTools(server: McpServer, client: WAHAClient): vo
     description: 'Stop the typing indicator previously started with waha_start_typing.',
     schema: {
       chatId: z.string().describe('Chat ID (e.g. "123@c.us" or "123@g.us")'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { idempotentHint: true },
     handler: async ({ chatId, session }) => {

@@ -12,6 +12,37 @@ export class WAHAApiError extends Error {
   }
 }
 
+/**
+ * Resources that appear right after the session segment in session-scoped
+ * paths (/api/{session}/chats, ...). Used to tell those apart from global
+ * roots like /api/contacts/all or /api/sendText where the first segment is
+ * NOT a session name.
+ */
+const SESSION_SCOPED_RESOURCES = new Set([
+  'chats',
+  'groups',
+  'labels',
+  'status',
+  'presence',
+  'auth',
+  'lids',
+  'contacts',
+  'profile',
+]);
+
+/** Extract the session name from a session-scoped path, if present. */
+function sessionFromPath(path: string): string | undefined {
+  // Session management endpoints: /api/sessions/{name}[/action]
+  const managed = /^\/api\/sessions\/([^/?]+)/.exec(path);
+  if (managed) return decodeURIComponent(managed[1]);
+  // Session-scoped endpoints: /api/{session}/{resource}/...
+  const scoped = /^\/api\/([^/?]+)\/([^/?]+)/.exec(path);
+  if (scoped && SESSION_SCOPED_RESOURCES.has(scoped[2])) {
+    return decodeURIComponent(scoped[1]);
+  }
+  return undefined;
+}
+
 export class WAHAClient {
   private baseUrl: string;
   private apiKey: string;
@@ -68,20 +99,7 @@ export class WAHAClient {
     }
 
     if (!response.ok) {
-      let errorBody: WAHAError | string;
-      try {
-        errorBody = await response.json() as WAHAError;
-      } catch {
-        errorBody = await response.text().catch(() => '');
-      }
-
-      const message = typeof errorBody === 'object' && errorBody.message
-        ? errorBody.message
-        : typeof errorBody === 'string' && errorBody
-          ? errorBody
-          : `HTTP ${response.status}`;
-
-      throw new WAHAApiError(`WAHA API error (${response.status}): ${message}`, response.status);
+      throw await this.buildApiError(response, method, path);
     }
 
     const contentType = response.headers.get('content-type');
@@ -92,6 +110,73 @@ export class WAHAClient {
     const text = await response.text();
     return text as unknown as T;
   }
+
+  /**
+   * Build a self-explanatory error from a failed WAHA response (issue #3):
+   * always include method + path + the WAHA response body's message, and map
+   * common failure modes (bad API key, unknown/not-ready session) to guidance
+   * the calling agent can act on — including the list of available sessions.
+   */
+  private async buildApiError(response: Response, method: string, path: string): Promise<WAHAApiError> {
+    // Read as text first — the body stream can only be consumed once, so a
+    // json() that throws would leave nothing for a text() fallback.
+    const raw = await response.text().catch(() => '');
+    let bodyMessage = raw;
+    try {
+      const errorBody = JSON.parse(raw) as WAHAError;
+      bodyMessage =
+        typeof errorBody?.message === 'string' && errorBody.message
+          ? errorBody.message
+          : typeof errorBody?.error === 'string' && errorBody.error
+            ? errorBody.error
+            : raw;
+    } catch {
+      // not JSON — keep raw text
+    }
+
+    const status = response.status;
+    let message = `WAHA API error (${status}) on ${method} ${path}: ${bodyMessage || `HTTP ${status}`}`;
+
+    if (status === 401 || status === 403) {
+      message += '. WAHA rejected the API key — check WAHA_API_KEY.';
+    } else {
+      const session = sessionFromPath(path);
+      if (session && (status === 404 || status === 422)) {
+        const hint = await this.sessionHint(session);
+        if (hint) message += ` — ${hint}`;
+      }
+    }
+
+    return new WAHAApiError(message, status);
+  }
+
+  /**
+   * Explain a session-related failure: is the session missing (and which exist),
+   * or present but not WORKING? Best-effort — returns '' if the lookup fails.
+   */
+  private async sessionHint(session: string): Promise<string> {
+    if (this.sessionHintInFlight) return '';
+    this.sessionHintInFlight = true;
+    try {
+      const sessions = await this.get<Array<{ name: string; status?: string }>>('/api/sessions', { all: true });
+      if (!Array.isArray(sessions)) return '';
+      const found = sessions.find((s) => s.name === session);
+      if (!found) {
+        const names = sessions.map((s) => `'${s.name}'`).join(', ') || '(none)';
+        return `Session '${session}' does not exist. Available sessions: [${names}] — pass the correct \`session\` argument.`;
+      }
+      if (found.status && found.status !== 'WORKING') {
+        return `Session '${session}' exists but is in state '${found.status}' — it must be WORKING. Start it with waha_start_session or re-authenticate.`;
+      }
+      return '';
+    } catch {
+      return '';
+    } finally {
+      this.sessionHintInFlight = false;
+    }
+  }
+
+  private sessionHintInFlight = false;
 
   async get<T>(path: string, queryParams?: Record<string, string | number | boolean | undefined>): Promise<T> {
     return this.request<T>('GET', path, undefined, queryParams);

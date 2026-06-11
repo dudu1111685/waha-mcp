@@ -127,10 +127,13 @@ scripts. What we learned, the hard way:
   per 10 min. Never burst create+picture+invite+settings.
 - **Pace messages** — bursts are the clearest bot signal.
 
-waha-mcp **enforces these last two automatically** (a built-in throttle: 3–8s
-jitter between sends, ≤8/min, group mutations ≥2min apart). When a tool answers
-`Rate limit: wait Ns`, that's the throttle protecting the account — wait and
-retry, don't hammer.
+waha-mcp includes an optional anti-ban throttle (3–8s jitter between sends,
+≤8/min, group mutations ≥2min apart). It is **off by default** — the GOWS
+engine fixed the `device_removed` disconnects that made it necessary for
+everyday use. Set `WAHA_THROTTLE=1` to enable it. For high-volume or bursty
+sends to many recipients it is still strongly recommended, since WhatsApp's
+server-side anti-spam is engine-independent. When the throttle is on and a
+tool answers `Rate limit: wait Ns`, wait and retry — don't hammer.
 
 ## Quick health check
 

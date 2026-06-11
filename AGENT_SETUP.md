@@ -40,6 +40,7 @@ into any agent's standing instructions).
       "env": {
         "WAHA_API_KEY": "your-api-key-here",
         "WAHA_URL": "http://localhost:3001",
+        "WAHA_DEFAULT_SESSION": "default",
         "SONIOX_API_KEY": "your-soniox-key",
         "USER_WHATSAPP_CHAT_ID": "1234567890@c.us"
       }
@@ -48,6 +49,12 @@ into any agent's standing instructions).
 }
 ```
 
+`WAHA_DEFAULT_SESSION` makes every tool default to that session name. For a
+single-account setup, set it to your session name (e.g. `default`). Omit it
+if you connect multiple WhatsApp accounts and want each tool call to require an
+explicit `session` — that way a missing argument is a schema error rather than a
+silent send from the wrong account.
+
 Restart the client after editing, then verify: ask for the WAHA tool list and
 send yourself a test message.
 
@@ -55,8 +62,11 @@ send yourself a test message.
 
 Launch command: `node /path/to/waha-mcp/dist/index.js` over stdio.
 Required env: `WAHA_API_KEY`. Optional: `WAHA_URL` (default
-`http://localhost:3001`), `SONIOX_API_KEY` (voice transcription),
-`WAHA_TIMEOUT_MS`, `WAHA_MCP_FILES_DIR` (sandbox for local-file reads),
+`http://localhost:3001`), `WAHA_DEFAULT_SESSION` (session name to use when the
+caller omits `session`; if unset, `session` is required on every call),
+`WAHA_THROTTLE=1` (enable anti-ban send pacing — off by default),
+`SONIOX_API_KEY` (voice transcription), `WAHA_TIMEOUT_MS`,
+`WAHA_MCP_FILES_DIR` (sandbox for local-file reads),
 `USER_WHATSAPP_CHAT_ID` (owner's chat for agent-initiated questions).
 
 ---

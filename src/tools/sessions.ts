@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { sessionParam } from '../utils/session.js';
 import { WAHAClient } from '../client.js';
 import { SessionInfo, WebhookConfig } from '../types.js';
 import { defineTool } from '../utils/define-tool.js';
@@ -33,7 +34,7 @@ export function registerSessionTools(server: McpServer, client: WAHAClient): voi
     name: 'waha_get_session',
     description: 'Get full details of one WhatsApp session, including its config (webhooks, store, metadata). Use when waha_list_sessions is not enough.',
     schema: {
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { readOnlyHint: true },
     handler: async ({ session }) => {
@@ -46,7 +47,9 @@ export function registerSessionTools(server: McpServer, client: WAHAClient): voi
     name: 'waha_create_session',
     description: 'Create and start a new WhatsApp session. The NOWEB store is enabled by default — without the store enabled on NOWEB/GOWS engines, all chats/contacts/messages read tools return empty. After creation the session usually needs QR pairing (status SCAN_QR_CODE).',
     schema: {
-      session: z.string().default('default').describe('Session name (same param name as all other session tools)'),
+      // Always explicit — creating a session must never silently inherit
+      // WAHA_DEFAULT_SESSION as the new session's name.
+      session: z.string().describe('Name for the NEW session — always required, never defaulted'),
       webhookUrl: z.string().optional().describe('Webhook URL to receive events'),
       webhookEvents: z.array(z.string()).optional().describe('Events to subscribe to, e.g. ["message", "session.status"] (default both)'),
       webhookHmacKey: z.string().optional().describe('HMAC key to sign webhook payloads'),
@@ -84,7 +87,7 @@ export function registerSessionTools(server: McpServer, client: WAHAClient): voi
     name: 'waha_start_session',
     description: 'Start a stopped WhatsApp session.',
     schema: {
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { idempotentHint: true },
     handler: async ({ session }) => {
@@ -97,7 +100,7 @@ export function registerSessionTools(server: McpServer, client: WAHAClient): voi
     name: 'waha_stop_session',
     description: 'Stop a running WhatsApp session (keeps it configured; can be started again later).',
     schema: {
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { idempotentHint: true },
     handler: async ({ session }) => {
@@ -110,7 +113,7 @@ export function registerSessionTools(server: McpServer, client: WAHAClient): voi
     name: 'waha_restart_session',
     description: 'Restart a WhatsApp session. Use when a session is stuck or misbehaving.',
     schema: {
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     handler: async ({ session }) => {
       const result = await client.post<SessionInfo>(`/api/sessions/${encodeURIComponent(session)}/restart`);
@@ -122,7 +125,8 @@ export function registerSessionTools(server: McpServer, client: WAHAClient): voi
     name: 'waha_delete_session',
     description: 'Permanently delete a WhatsApp session and its stored data. Irreversible — requires re-pairing via QR to use that account again.',
     schema: {
-      session: z.string().default('default').describe('Session name'),
+      // Destructive: must be named explicitly, never inherited from WAHA_DEFAULT_SESSION.
+      session: z.string().describe('Session to DELETE — always required, never defaulted'),
     },
     annotations: { destructiveHint: true },
     handler: async ({ session }) => {
@@ -135,7 +139,8 @@ export function registerSessionTools(server: McpServer, client: WAHAClient): voi
     name: 'waha_logout_session',
     description: 'Log out the WhatsApp account from a session (session config is kept, but the device is unpaired — re-pairing via QR is required).',
     schema: {
-      session: z.string().default('default').describe('Session name'),
+      // Destructive: must be named explicitly, never inherited from WAHA_DEFAULT_SESSION.
+      session: z.string().describe('Session to LOG OUT — always required, never defaulted'),
     },
     annotations: { destructiveHint: true },
     handler: async ({ session }) => {
@@ -148,7 +153,7 @@ export function registerSessionTools(server: McpServer, client: WAHAClient): voi
     name: 'waha_screenshot',
     description: 'Visual debug of the WhatsApp Web screen for a stuck session. Returns a screenshot image (e.g. to see a QR code or an error screen).',
     schema: {
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { readOnlyHint: true },
     handler: async ({ session }) => {

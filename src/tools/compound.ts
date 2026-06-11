@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { sessionParam } from '../utils/session.js';
 import { WAHAClient } from '../client.js';
 import { ChatInfo, ContactInfo, SendResult, WAMessage } from '../types.js';
 import { defineTool } from '../utils/define-tool.js';
@@ -73,7 +74,7 @@ export function registerCompoundTools(server: McpServer, client: WAHAClient): vo
       "Use whenever the user refers to a person/group by name — resolves to chatId (like 123@c.us / 123@g.us). Call before any send/read tool if you don't have the chatId.",
     schema: {
       query: z.string().describe('Human name to search for, e.g. "Shlomo" or "Family group"'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
       limit: z.number().int().min(1).max(100).default(5).describe('Max matches to return'),
     },
     annotations: { readOnlyHint: true },
@@ -146,7 +147,7 @@ export function registerCompoundTools(server: McpServer, client: WAHAClient): vo
     schema: {
       chatId: z.string().describe('Chat ID, e.g. 123@c.us or 123@g.us'),
       text: z.string().describe('Message text to send'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
       replyToMessageId: z.string().optional().describe('Message ID to quote-reply to'),
       markSeenFirst: z.boolean().default(true).describe('Mark the chat as seen before typing (human-like)'),
     },
@@ -190,7 +191,7 @@ export function registerCompoundTools(server: McpServer, client: WAHAClient): vo
       "PRIMARY tool for 'read what X wrote': returns the conversation rendered for reading — names resolved, voice notes transcribed inline, media summarized. Prefer this over waha_get_messages. chatId like 123@c.us / 123@g.us.",
     schema: {
       chatId: z.string().describe('Chat ID, e.g. 123@c.us or 123@g.us'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
       limit: z.number().int().min(1).max(100).default(30).describe('Max messages to fetch'),
       sinceTimestamp: z.number().int().optional().describe('Only messages at/after this unix timestamp (seconds)'),
       transcribeVoice: z.boolean().default(true).describe('Transcribe voice notes inline (requires SONIOX_API_KEY)'),

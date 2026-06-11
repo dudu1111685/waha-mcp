@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { sessionParam } from '../utils/session.js';
 import { WAHAClient } from '../client.js';
 import { SendResult } from '../types.js';
 import { defineTool } from '../utils/define-tool.js';
@@ -31,7 +32,7 @@ export function registerStatusTools(server: McpServer, client: WAHAClient): void
     description:
       'Publish a text WhatsApp Status (story) visible to your contacts for 24h. Status API requires WAHA Plus and is engine-dependent (NOWEB has the best support).',
     schema: {
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
       text: z.string().describe('Status text'),
       backgroundColor: z.string().optional().describe('Background color hex, e.g. "#38b42f"'),
       font: z.number().int().min(0).max(5).optional().describe('Font style index (0-5)'),
@@ -54,7 +55,7 @@ export function registerStatusTools(server: McpServer, client: WAHAClient): void
     description:
       'Publish an image WhatsApp Status (story) from a URL or a local file path. Status API requires WAHA Plus and is engine-dependent (NOWEB has the best support).',
     schema: {
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
       imageUrl: z.string().optional().describe('Public URL of the image'),
       imagePath: z.string().optional().describe('Local file path of the image (e.g. "/tmp/photo.jpg")'),
       caption: z.string().optional().describe('Caption shown with the image'),
@@ -77,7 +78,7 @@ export function registerStatusTools(server: McpServer, client: WAHAClient): void
     description:
       'Publish a voice WhatsApp Status (story) from a URL or a local file path (OGG/Opus preferred). Status API requires WAHA Plus and is engine-dependent (NOWEB has the best support).',
     schema: {
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
       audioUrl: z.string().optional().describe('Public URL of the audio file (OGG/Opus preferred)'),
       audioPath: z.string().optional().describe('Local file path of the audio (e.g. "/tmp/voice.opus")'),
       convert: z.boolean().default(true).describe('Auto-convert to OGG/Opus (required format; recommended for MP3/WAV)'),
@@ -98,7 +99,7 @@ export function registerStatusTools(server: McpServer, client: WAHAClient): void
     description:
       'Delete a previously published WhatsApp Status (story) by its message id (as returned when it was sent). Irreversible. Status API requires WAHA Plus and is engine-dependent (NOWEB has the best support).',
     schema: {
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
       id: z.string().describe('Status message id to delete'),
     },
     annotations: { destructiveHint: true },

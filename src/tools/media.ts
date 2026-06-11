@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { sessionParam } from '../utils/session.js';
 import { WAHAClient } from '../client.js';
 import { WAMessage } from '../types.js';
 import { defineTool } from '../utils/define-tool.js';
@@ -61,7 +62,7 @@ export function registerMediaTools(server: McpServer, client: WAHAClient): void 
     schema: {
       chatId: z.string().describe('Chat ID, e.g. 123@c.us or 123@g.us'),
       messageId: z.string().describe('Message ID of the audio message'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
       languageHints: z
         .array(z.string())
         .optional()
@@ -95,7 +96,7 @@ export function registerMediaTools(server: McpServer, client: WAHAClient): void 
     schema: {
       chatId: z.string().describe('Chat ID, e.g. 123@c.us or 123@g.us'),
       messageId: z.string().describe('Message ID with media'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
       output: z
         .enum(['inline', 'path'])
         .default('inline')

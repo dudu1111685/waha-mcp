@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { sessionParam } from '../utils/session.js';
 import { WAHAClient } from '../client.js';
 import { WAMessage } from '../types.js';
 import { defineTool } from '../utils/define-tool.js';
@@ -74,7 +75,7 @@ export function registerChatTools(server: McpServer, client: WAHAClient): void {
     name: 'waha_list_chats',
     description: 'List chats in a WhatsApp session (id, name; last activity and flags when the engine provides them). Prefer waha_inbox for unread counts and last-message previews.',
     schema: {
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
       limit: z.number().int().min(1).max(100).default(30).describe('Max results'),
       offset: z.number().int().min(0).default(0).describe('Pagination offset'),
       sortBy: z.enum(['conversationTimestamp', 'id', 'name']).optional().describe('Sort field'),
@@ -94,7 +95,7 @@ export function registerChatTools(server: McpServer, client: WAHAClient): void {
     name: 'waha_inbox',
     description: 'Call this first to see what needs attention — returns chats sorted by recent activity with last-message previews (and unread counts where the engine provides them; not available on NOWEB).',
     schema: {
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
       limit: z.number().int().min(1).max(100).default(20).describe('Max results'),
       offset: z.number().int().min(0).default(0).describe('Pagination offset'),
     },
@@ -113,7 +114,7 @@ export function registerChatTools(server: McpServer, client: WAHAClient): void {
     description: 'Get detailed info about a specific chat. chatId like 123@c.us (user) or 123@g.us (group).',
     schema: {
       chatId: z.string().describe('Chat ID (123@c.us / 123@g.us)'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { readOnlyHint: true },
     handler: async ({ chatId, session }) => {
@@ -136,7 +137,7 @@ export function registerChatTools(server: McpServer, client: WAHAClient): void {
     schema: {
       chatId: z.string().describe('Chat ID (123@c.us / 123@g.us)'),
       archive: z.boolean().default(true).describe('true to archive, false to unarchive'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { idempotentHint: true },
     handler: async ({ chatId, archive, session }) => {
@@ -157,7 +158,7 @@ export function registerChatTools(server: McpServer, client: WAHAClient): void {
     description: 'Mark a chat as unread so a human notices it needs follow-up. chatId like 123@c.us / 123@g.us.',
     schema: {
       chatId: z.string().describe('Chat ID (123@c.us / 123@g.us)'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { idempotentHint: true },
     handler: async ({ chatId, session }) => {
@@ -173,7 +174,7 @@ export function registerChatTools(server: McpServer, client: WAHAClient): void {
     description: 'Permanently delete a chat and its history — irreversible. chatId like 123@c.us / 123@g.us.',
     schema: {
       chatId: z.string().describe('Chat ID (123@c.us / 123@g.us)'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { destructiveHint: true },
     handler: async ({ chatId, session }) => {
@@ -189,7 +190,7 @@ export function registerChatTools(server: McpServer, client: WAHAClient): void {
     description: 'Delete all messages in a chat (keeps the chat itself) — irreversible. chatId like 123@c.us / 123@g.us.',
     schema: {
       chatId: z.string().describe('Chat ID (123@c.us / 123@g.us)'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { destructiveHint: true },
     handler: async ({ chatId, session }) => {

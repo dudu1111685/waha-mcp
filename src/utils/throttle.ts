@@ -1,7 +1,11 @@
 /**
- * Anti-ban throttle layer. WhatsApp force-unlinks devices (stream conflict
- * "device_removed") and eventually bans accounts that behave like scripts.
- * Known community/WAHA limits this enforces:
+ * Anti-ban throttle layer — OPT-IN (disabled by default; set WAHA_THROTTLE=1
+ * to enable). The GOWS engine fixed the device_removed disconnects that
+ * motivated aggressive pacing, and the owner chose responsiveness over
+ * built-in pacing. Note: WhatsApp's server-side anti-spam heuristics are
+ * engine-independent, so bulk/bursty sending is still your own risk.
+ *
+ * When enabled, limits applied:
  *  - random 3-8s gap between any two sends (humans don't fire instantly)
  *  - max 8 sends per rolling minute, globally
  *  - min 8s gap between sends to the SAME chat
@@ -26,8 +30,9 @@ const sendTimestamps: number[] = [];
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Escape hatch for E2E tool-correctness runs. Never set in production. */
-const isDisabled = (): boolean => process.env.WAHA_THROTTLE_DISABLED === '1';
+/** Throttle is opt-in: enabled only when WAHA_THROTTLE=1 (and not force-disabled). */
+const isDisabled = (): boolean =>
+  process.env.WAHA_THROTTLE !== '1' || process.env.WAHA_THROTTLE_DISABLED === '1';
 
 /** Test hook: reset all throttle state. */
 export function resetThrottle(): void {

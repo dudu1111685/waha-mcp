@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { sessionParam } from '../utils/session.js';
 import { WAHAClient } from '../client.js';
 import { ChatInfo, Label } from '../types.js';
 import { defineTool } from '../utils/define-tool.js';
@@ -19,7 +20,7 @@ export function registerLabelTools(server: McpServer, client: WAHAClient): void 
     description:
       'List all labels defined in the WhatsApp account. Use to find label ids before tagging chats or querying chats by label.',
     schema: {
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { readOnlyHint: true },
     handler: async ({ session }) => {
@@ -34,7 +35,7 @@ export function registerLabelTools(server: McpServer, client: WAHAClient): void 
     schema: {
       name: z.string().describe('Label name'),
       color: z.number().int().min(0).max(19).default(0).describe('Label color index (0-19; WAHA requires a color)'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     handler: async ({ name, color, session }) => {
       const label = await client.post<Label>(`/api/${encodeURIComponent(session)}/labels`, { name, color });
@@ -49,7 +50,7 @@ export function registerLabelTools(server: McpServer, client: WAHAClient): void 
       labelId: z.string().describe('Label ID'),
       name: z.string().describe('New label name'),
       color: z.number().int().min(0).max(19).default(0).describe('Label color index (0-19; WAHA requires a color — pass the current one to keep it)'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { idempotentHint: true },
     handler: async ({ labelId, name, color, session }) => {
@@ -66,7 +67,7 @@ export function registerLabelTools(server: McpServer, client: WAHAClient): void 
     description: 'Permanently delete a label from the WhatsApp account. It is removed from all chats.',
     schema: {
       labelId: z.string().describe('Label ID'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { destructiveHint: true, idempotentHint: true },
     handler: async ({ labelId, session }) => {
@@ -83,7 +84,7 @@ export function registerLabelTools(server: McpServer, client: WAHAClient): void 
       'Get the labels currently assigned to a chat. chatId like 123@c.us (person) or 123@g.us (group).',
     schema: {
       chatId: z.string().describe('Chat ID, e.g. 123@c.us or 123@g.us'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { readOnlyHint: true },
     handler: async ({ chatId, session }) => {
@@ -101,7 +102,7 @@ export function registerLabelTools(server: McpServer, client: WAHAClient): void 
     schema: {
       chatId: z.string().describe('Chat ID, e.g. 123@c.us or 123@g.us'),
       labelIds: z.array(z.string()).describe('Label IDs the chat should have (replaces existing)'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { idempotentHint: true },
     handler: async ({ chatId, labelIds, session }) => {
@@ -119,7 +120,7 @@ export function registerLabelTools(server: McpServer, client: WAHAClient): void 
       'List all chats tagged with a given label — e.g. retrieve every chat marked "needs-human". Get label ids with waha_get_labels.',
     schema: {
       labelId: z.string().describe('Label ID'),
-      session: z.string().default('default').describe('Session name'),
+      session: sessionParam(),
     },
     annotations: { readOnlyHint: true },
     handler: async ({ labelId, session }) => {
